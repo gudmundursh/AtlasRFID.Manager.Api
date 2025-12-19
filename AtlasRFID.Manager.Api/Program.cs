@@ -11,9 +11,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddSingleton<DbConnectionFactory>();
 builder.Services.AddScoped<CompanyRepository>();
-builder.Services.AddScoped<ITenantProvider, SingleTenantProvider>();
+//builder.Services.AddScoped<ITenantProvider, SingleTenantProvider>();
+builder.Services.AddScoped<ITenantProvider, JwtOrSingleTenantProvider>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddSingleton<JwtTokenService>();
+builder.Services.AddHttpContextAccessor();
+
 
 
 var jwtIssuer = builder.Configuration["Jwt:Issuer"];

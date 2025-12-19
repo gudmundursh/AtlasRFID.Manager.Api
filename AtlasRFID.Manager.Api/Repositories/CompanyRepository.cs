@@ -66,6 +66,19 @@ namespace AtlasRFID.Manager.Api.Repositories
 
             return await connection.QuerySingleOrDefaultAsync<Company>(sql, new { Id = id });
         }
+        public async Task<IEnumerable<Company>> GetAllSystemAsync()
+        {
+            using var connection = _connectionFactory.Create();
+
+            const string sql = @"
+                SELECT Id, Code, Name, IsActive
+                FROM Companies
+                ORDER BY Name
+            ";
+
+            return await connection.QueryAsync<Company>(sql);
+        }
+
 
 
     }
