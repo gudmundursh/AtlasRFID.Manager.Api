@@ -1,11 +1,13 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using AtlasRFID.Manager.Api.Dtos;
+﻿using AtlasRFID.Manager.Api.Dtos;
 using AtlasRFID.Manager.Api.Models;
 using AtlasRFID.Manager.Api.Repositories;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 
 namespace AtlasRFID.Manager.Api.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/companies")]
     public class CompaniesController : ControllerBase
