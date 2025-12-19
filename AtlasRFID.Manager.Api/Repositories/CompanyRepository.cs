@@ -1,12 +1,24 @@
-﻿using Dapper;
-using AtlasRFID.Manager.Api.Data;
+﻿using AtlasRFID.Manager.Api.Data;
 using AtlasRFID.Manager.Api.Models;
+using AtlasRFID.Manager.Api.Security;
+using Dapper;
 
 namespace AtlasRFID.Manager.Api.Repositories
 {
     public class CompanyRepository
     {
         private readonly DbConnectionFactory _connectionFactory;
+
+        private readonly ITenantProvider _tenant;
+
+        public CompanyRepository(
+            DbConnectionFactory connectionFactory,
+            ITenantProvider tenant)
+        {
+            _connectionFactory = connectionFactory;
+            _tenant = tenant;
+        }
+
 
         public CompanyRepository(DbConnectionFactory connectionFactory)
         {
@@ -18,12 +30,15 @@ namespace AtlasRFID.Manager.Api.Repositories
             using var connection = _connectionFactory.Create();
 
             const string sql = @"
-                SELECT Id, Name, IsActive
+                SELECT Id, Code, Name, IsActive
                 FROM Companies
-                ORDER BY Name
-            ";
+                WHERE Id = @CompanyId
+                ";
 
-            return await connection.QueryAsync<Company>(sql);
+            return await connection.QueryAsync<Company>(
+                sql,
+                new { CompanyId = _tenant.GetCompanyId() }
+            );
         }
         public async Task<Guid> CreateAsync(string code, string name)
         {
