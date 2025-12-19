@@ -41,6 +41,15 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("SuperAdminOnly", policy =>
+        policy.RequireClaim("is_super_admin", "true"));
+
+    options.AddPolicy("CompanyAdminOnly", policy =>
+        policy.RequireClaim("is_company_admin", "true"));
+});
+
 
 
 var app = builder.Build();
