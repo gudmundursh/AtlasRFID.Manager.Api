@@ -14,8 +14,11 @@ builder.Services.AddScoped<CompanyRepository>();
 //builder.Services.AddScoped<ITenantProvider, SingleTenantProvider>();
 builder.Services.AddScoped<ITenantProvider, JwtOrSingleTenantProvider>();
 builder.Services.AddScoped<UserRepository>();
+builder.Services.AddScoped<LogRepository>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddHttpContextAccessor();
+
+
 
 
 

@@ -66,5 +66,70 @@ namespace AtlasRFID.Manager.Api.Repositories
 
             await connection.ExecuteAsync(sql, new { Id = userId });
         }
+        public async Task<Guid> CreateAsync(
+            Guid? companyId,
+            string userName,
+            string email,
+            string displayName,
+            string passwordHash,
+            bool isSuperAdmin,
+            bool isCompanyAdmin,
+            bool isActive,
+            Guid createdByUserId)
+        {
+            using var connection = _connectionFactory.Create();
+
+            var id = Guid.NewGuid();
+
+            const string sql = @"
+            INSERT INTO Users
+            (
+            Id, CompanyId, UserName, Email, DisplayName,
+            PasswordHash, PasswordUpdatedAt,
+            IsSuperAdmin, IsCompanyAdmin, IsActive,
+            FailedLoginCount, IsDeleted,
+            CreatedAt, CreatedByUserId
+            )
+            VALUES
+            (
+            @Id, @CompanyId, @UserName, @Email, @DisplayName,
+            @PasswordHash, SYSUTCDATETIME(),
+            @IsSuperAdmin, @IsCompanyAdmin, @IsActive,
+            0, 0,
+            SYSUTCDATETIME(), @CreatedByUserId
+            );
+            ";
+
+            await connection.ExecuteAsync(sql, new
+            {
+                Id = id,
+                CompanyId = companyId,
+                UserName = userName,
+                Email = email,
+                DisplayName = displayName,
+                PasswordHash = passwordHash,
+                IsSuperAdmin = isSuperAdmin ? 1 : 0,
+                IsCompanyAdmin = isCompanyAdmin ? 1 : 0,
+                IsActive = isActive ? 1 : 0,
+                CreatedByUserId = createdByUserId
+            });
+
+            return id;
+        }
+
+        public async Task<bool> UserNameOrEmailExistsAsync(string userName, string email)
+        {
+            using var connection = _connectionFactory.Create();
+
+            const string sql = @"
+        SELECT CASE WHEN EXISTS(
+            SELECT 1 FROM Users
+            WHERE IsDeleted = 0 AND (UserName = @UserName OR Email = @Email)
+        ) THEN 1 ELSE 0 END;
+    ";
+
+            return await connection.ExecuteScalarAsync<int>(sql, new { UserName = userName, Email = email }) == 1;
+        }
+
     }
 }

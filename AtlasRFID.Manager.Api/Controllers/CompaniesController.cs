@@ -19,7 +19,7 @@ namespace AtlasRFID.Manager.Api.Controllers
             _repository = repository;
         }
 
-        [Authorize(Policy = "SuperAdminOnly")]
+        [Authorize(Policy = "CompanyAdminOnly")]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
