@@ -21,9 +21,9 @@ namespace AtlasRFID.Manager.Api.Controllers
 
         [HttpGet]
         public async Task<IActionResult> Search(
-            [FromQuery] string category,
-            [FromQuery] string level,
-            [FromQuery] string q,
+            [FromQuery] string? category,
+            [FromQuery] string? level,
+            [FromQuery] string? q,
             [FromQuery] DateTime? fromUtc,
             [FromQuery] DateTime? toUtc,
             [FromQuery] int take = 200)
