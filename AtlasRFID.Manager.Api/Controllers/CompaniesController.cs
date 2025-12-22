@@ -1,9 +1,8 @@
 ﻿using AtlasRFID.Manager.Api.Dtos;
-using AtlasRFID.Manager.Api.Models;
 using AtlasRFID.Manager.Api.Repositories;
+using AtlasRFID.Manager.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-
 
 namespace AtlasRFID.Manager.Api.Controllers
 {
@@ -13,10 +12,17 @@ namespace AtlasRFID.Manager.Api.Controllers
     public class CompaniesController : ControllerBase
     {
         private readonly CompanyRepository _repository;
+        private readonly IAuditLogger _audit;
+        private readonly ICorrelationIdProvider _corr;
 
-        public CompaniesController(CompanyRepository repository)
+        public CompaniesController(
+            CompanyRepository repository,
+            IAuditLogger audit,
+            ICorrelationIdProvider corr)
         {
             _repository = repository;
+            _audit = audit;
+            _corr = corr;
         }
 
         [Authorize(Policy = "CompanyAdminOnly")]
@@ -26,6 +32,7 @@ namespace AtlasRFID.Manager.Api.Controllers
             var companies = await _repository.GetAllAsync();
             return Ok(companies);
         }
+
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateCompanyRequest request)
         {
@@ -38,8 +45,27 @@ namespace AtlasRFID.Manager.Api.Controllers
             if (created == null)
                 return StatusCode(500, new { error = "create_company_failed" });
 
+            // --- audit log ---
+            Guid? userId = null;
+            var userIdStr = User.FindFirst("user_id")?.Value;
+            if (Guid.TryParse(userIdStr, out var parsedUserId))
+                userId = parsedUserId;
+
+            await _audit.WriteAsync(
+                companyId: null,
+                userId: userId,
+                action: "Create",
+                entityType: "Company",
+                entityId: created.Id,
+                before: null,
+                after: created,
+                message: $"Created company '{created.Name}'",
+                correlationId: _corr.Get()
+            );
+
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
+
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> GetById(Guid id)
         {
@@ -47,6 +73,5 @@ namespace AtlasRFID.Manager.Api.Controllers
             if (company == null) return NotFound();
             return Ok(company);
         }
-
     }
 }
