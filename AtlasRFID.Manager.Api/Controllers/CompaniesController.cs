@@ -9,7 +9,7 @@ namespace AtlasRFID.Manager.Api.Controllers
     [Authorize]
     [ApiController]
     [Route("api/companies")]
-    public class CompaniesController : ControllerBase
+    public class CompaniesController : AppControllerBase
     {
         private readonly CompanyRepository _repository;
         private readonly IAuditLogger _audit;
@@ -51,17 +51,17 @@ namespace AtlasRFID.Manager.Api.Controllers
             if (Guid.TryParse(userIdStr, out var parsedUserId))
                 userId = parsedUserId;
 
-            await _audit.WriteAsync(
+            await AuditAsync(
+                _audit, _corr,
                 companyId: null,
-                userId: userId,
                 action: "Create",
                 entityType: "Company",
                 entityId: created.Id,
                 before: null,
                 after: created,
-                message: $"Created company '{created.Name}'",
-                correlationId: _corr.Get()
+                message: $"Created company '{created.Name}'"
             );
+
 
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
