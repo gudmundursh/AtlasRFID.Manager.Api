@@ -8,7 +8,12 @@ namespace AtlasRFID.Manager.Api.Controllers
     {
         protected Guid? GetUserIdOrNull()
         {
-            var userIdStr = User.FindFirst("user_id")?.Value;
+            // Prefer your custom claim first
+            var userIdStr =
+                User.FindFirst("user_id")?.Value ??
+                User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ??
+                User.FindFirst("sub")?.Value;
+
             return Guid.TryParse(userIdStr, out var id) ? id : (Guid?)null;
         }
 

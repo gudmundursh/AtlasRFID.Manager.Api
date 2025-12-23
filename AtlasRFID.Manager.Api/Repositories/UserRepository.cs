@@ -125,11 +125,90 @@ namespace AtlasRFID.Manager.Api.Repositories
         SELECT CASE WHEN EXISTS(
             SELECT 1 FROM Users
             WHERE IsDeleted = 0 AND (UserName = @UserName OR Email = @Email)
-        ) THEN 1 ELSE 0 END;
-    ";
+            ) THEN 1 ELSE 0 END;
+        ";
 
             return await connection.ExecuteScalarAsync<int>(sql, new { UserName = userName, Email = email }) == 1;
         }
+        public async Task<dynamic> GetByIdForAdminAsync(Guid id)
+        {
+            using var connection = _connectionFactory.Create();
+
+            const string sql = @"
+                SELECT
+                Id,
+                CompanyId,
+                UserName,
+                Email,
+                DisplayName,
+                IsSuperAdmin,
+                IsCompanyAdmin,
+                IsActive,
+                FailedLoginCount,
+                LockoutUntil,
+                LastLoginAt,
+                CreatedAt,
+                CreatedByUserId,
+                UpdatedAt,
+                UpdatedByUserId,
+                IsDeleted
+                FROM Users
+                WHERE Id = @Id AND IsDeleted = 0;
+            ";
+            return await connection.QuerySingleOrDefaultAsync(sql, new { Id = id });
+        }
+        public async Task UpdateAsync(
+            Guid id,
+            string email,
+            string displayName,
+            bool isSuperAdmin,
+            bool isCompanyAdmin,
+            bool isActive,
+            Guid updatedByUserId)
+        {
+            using var connection = _connectionFactory.Create();
+
+            const string sql = @"
+                UPDATE Users
+                SET Email = @Email,
+                DisplayName = @DisplayName,
+                IsSuperAdmin = @IsSuperAdmin,
+                IsCompanyAdmin = @IsCompanyAdmin,
+                IsActive = @IsActive,
+                UpdatedAt = SYSUTCDATETIME(),
+                UpdatedByUserId = @UpdatedByUserId
+                WHERE Id = @Id AND IsDeleted = 0;
+            ";
+            await connection.ExecuteAsync(sql, new
+            {
+                Id = id,
+                Email = email,
+                DisplayName = displayName,
+                IsSuperAdmin = isSuperAdmin ? 1 : 0,
+                IsCompanyAdmin = isCompanyAdmin ? 1 : 0,
+                IsActive = isActive ? 1 : 0,
+                UpdatedByUserId = updatedByUserId
+            });
+        }
+        public async Task SetActiveAsync(Guid id, bool isActive, Guid updatedByUserId)
+        {
+            using var connection = _connectionFactory.Create();
+
+            const string sql = @"
+                UPDATE Users
+                SET IsActive = @IsActive,
+                UpdatedAt = SYSUTCDATETIME(),
+                UpdatedByUserId = @UpdatedByUserId
+                WHERE Id = @Id AND IsDeleted = 0;
+            ";
+            await connection.ExecuteAsync(sql, new
+            {
+                Id = id,
+                IsActive = isActive ? 1 : 0,
+                UpdatedByUserId = updatedByUserId
+            });
+        }
+
 
     }
 }
