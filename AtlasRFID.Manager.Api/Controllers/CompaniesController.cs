@@ -73,5 +73,65 @@ namespace AtlasRFID.Manager.Api.Controllers
             if (company == null) return NotFound();
             return Ok(company);
         }
+
+        [Authorize(Policy = "CompanyAdminOnly")]
+        [HttpPut("{id:guid}")]
+        public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCompanyRequest request)
+        {
+            if (!ModelState.IsValid)
+                return ValidationProblem(ModelState);
+
+            var before = await _repository.GetByIdAsync(id);
+            if (before == null) return NotFound();
+
+            await _repository.UpdateAsync(id, request.Name, request.IsActive);
+
+            var after = await _repository.GetByIdAsync(id);
+            if (after == null) return StatusCode(500, new { error = "update_company_failed" });
+
+            await AuditAsync(
+                _audit, _corr,
+                companyId: null,
+                action: "Update",
+                entityType: "Company",
+                entityId: id,
+                before: before,
+                after: after,
+                message: $"Updated company '{before.Name}' -> '{after.Name}', Active={after.IsActive}"
+            );
+
+            return Ok(after);
+        }
+
+        [Authorize(Policy = "CompanyAdminOnly")]
+        [HttpPost("{id:guid}/deactivate")]
+        public async Task<IActionResult> Deactivate(Guid id)
+        {
+            var before = await _repository.GetByIdAsync(id);
+            if (before == null) return NotFound();
+
+            if (!before.IsActive)
+                return Ok(before); // already inactive
+
+            await _repository.SetActiveAsync(id, false);
+
+            var after = await _repository.GetByIdAsync(id);
+            if (after == null) return StatusCode(500, new { error = "deactivate_company_failed" });
+
+            await AuditAsync(
+                _audit, _corr,
+                companyId: null,
+                action: "Deactivate",
+                entityType: "Company",
+                entityId: id,
+                before: before,
+                after: after,
+                message: $"Deactivated company '{after.Name}'"
+            );
+
+            return Ok(after);
+        }
+
+
     }
 }

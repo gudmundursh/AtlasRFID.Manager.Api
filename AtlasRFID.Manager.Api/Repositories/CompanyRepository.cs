@@ -54,6 +54,26 @@ namespace AtlasRFID.Manager.Api.Repositories
             await connection.ExecuteAsync(sql, new { Id = id, Code = code, Name = name });   //ExecuteAsync is for commands (INSERT/UPDATE/DELETE).
             return id;
         }
+        public async Task UpdateAsync(Guid id, string name, bool isActive)
+        {
+            using var conn = _connectionFactory.Create();
+
+            const string sql = @"
+                UPDATE dbo.Companies
+                SET Name = @Name,
+                IsActive = @IsActive
+                WHERE Id = @Id;
+            ";
+            await conn.ExecuteAsync(sql, new { Id = id, Name = name, IsActive = isActive });
+        }
+        public async Task SetActiveAsync(Guid id, bool isActive)
+        {
+            using var conn = _connectionFactory.Create();
+
+            const string sql = @"UPDATE dbo.Companies SET IsActive = @IsActive WHERE Id = @Id;";
+            await conn.ExecuteAsync(sql, new { Id = id, IsActive = isActive });
+        }
+
         public async Task<Company> GetByIdAsync(Guid id)
         {
             using var connection = _connectionFactory.Create();
