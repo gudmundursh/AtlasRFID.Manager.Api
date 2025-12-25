@@ -230,6 +230,25 @@ namespace AtlasRFID.Manager.Api.Repositories
                 UpdatedByUserId = updatedByUserId
             });
         }
+        public async Task<(Guid? CompanyId, bool IsSuperAdmin, string UserName)?> GetSecurityInfoAsync(Guid id)
+        {
+            using var connection = _connectionFactory.Create();
+
+            const string sql = @"
+                SELECT TOP 1 CompanyId, IsSuperAdmin, UserName
+                FROM Users
+                WHERE Id = @Id AND IsDeleted = 0;
+            ";
+
+            var row = await connection.QuerySingleOrDefaultAsync(sql, new { Id = id });
+            if (row == null) return null;
+
+            Guid? companyId = row.CompanyId;
+            bool isSuperAdmin = row.IsSuperAdmin == true;
+            string userName = row.UserName;
+
+            return (companyId, isSuperAdmin, userName);
+        }
 
 
     }
