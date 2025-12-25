@@ -194,6 +194,47 @@ namespace AtlasRFID.Manager.Api.Controllers
 
             return Ok(after);
         }
+        [HttpPost("{id:guid}/reset-password")]
+        public async Task<IActionResult> ResetPassword(Guid id, [FromBody] ResetPasswordRequest request)
+        {
+            if (!ModelState.IsValid)
+                return ValidationProblem(ModelState);
+
+            if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
+                return BadRequest(new { error = "password_too_short_min_8" });
+
+            var updatedByUserId = GetUserIdOrNull();
+            if (updatedByUserId == null)
+                return Unauthorized(new { error = "missing_user_id_claim" });
+
+            var before = await _users.GetByIdForAdminAsync(id);
+            if (before == null) return NotFound();
+
+            var hash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+            await _users.ResetPasswordAsync(id, hash, updatedByUserId.Value);
+
+            var after = await _users.GetByIdForAdminAsync(id);
+            if (after == null) return StatusCode(500, new { error = "reset_password_failed" });
+
+            Guid? companyId = (Guid?)after.CompanyId;
+
+            // IMPORTANT: audit only that it happened (no password/hash)
+            var auditBefore = new { before.Id, before.UserName, before.Email, before.DisplayName, before.PasswordUpdatedAt };
+            var auditAfter = new { after.Id, after.UserName, after.Email, after.DisplayName, after.PasswordUpdatedAt };
+
+            await AuditAsync(
+                _audit, _corr,
+                companyId: companyId,
+                action: "ResetPassword",
+                entityType: "User",
+                entityId: id,
+                before: auditBefore,
+                after: auditAfter,
+                message: $"Password reset for user '{after.UserName}'"
+            );
+
+            return Ok(new { ok = true });
+        }
 
     }
 }

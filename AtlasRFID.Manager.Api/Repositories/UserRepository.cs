@@ -208,6 +208,28 @@ namespace AtlasRFID.Manager.Api.Repositories
                 UpdatedByUserId = updatedByUserId
             });
         }
+        public async Task ResetPasswordAsync(Guid id, string passwordHash, Guid updatedByUserId)
+        {
+            using var connection = _connectionFactory.Create();
+
+            const string sql = @"
+                UPDATE Users
+                SET PasswordHash = @PasswordHash,
+                PasswordUpdatedAt = SYSUTCDATETIME(),
+                FailedLoginCount = 0,
+                LockoutUntil = NULL,
+                UpdatedAt = SYSUTCDATETIME(),
+                UpdatedByUserId = @UpdatedByUserId
+                WHERE Id = @Id AND IsDeleted = 0;
+            ";
+
+            await connection.ExecuteAsync(sql, new
+            {
+                Id = id,
+                PasswordHash = passwordHash,
+                UpdatedByUserId = updatedByUserId
+            });
+        }
 
 
     }
