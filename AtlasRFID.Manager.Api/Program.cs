@@ -15,6 +15,7 @@ builder.Services.AddScoped<CompanyRepository>();
 builder.Services.AddScoped<ITenantProvider, JwtOrSingleTenantProvider>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<LogRepository>();
+builder.Services.AddScoped<RbacRepository>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<AtlasRFID.Manager.Api.Services.IAuditLogger, AtlasRFID.Manager.Api.Services.AuditLogger>();
 builder.Services.AddHttpContextAccessor();
