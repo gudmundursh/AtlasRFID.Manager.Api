@@ -249,6 +249,91 @@ namespace AtlasRFID.Manager.Api.Repositories
 
             return (companyId, isSuperAdmin, userName);
         }
+        public async Task<IEnumerable<dynamic>> GetByCompanyAsync(Guid companyId)
+        {
+            using var connection = _connectionFactory.Create();
+
+            const string sql = @"
+                SELECT
+                Id,
+                CompanyId,
+                UserName,
+                Email,
+                DisplayName,
+                IsSuperAdmin,
+                IsCompanyAdmin,
+                IsActive,
+                FailedLoginCount,
+                LockoutUntil,
+                LastLoginAt,
+                CreatedAt,
+                CreatedByUserId,
+                UpdatedAt,
+                UpdatedByUserId
+                FROM Users
+                WHERE CompanyId = @CompanyId
+                AND IsDeleted = 0
+                ORDER BY UserName;
+                ";
+            return await connection.QueryAsync(sql, new { CompanyId = companyId });
+        }
+        public async Task UpdateTenantAsync(
+            Guid id,
+            Guid companyId,
+            string email,
+            string displayName,
+            bool isCompanyAdmin,
+            bool isActive,
+            Guid updatedByUserId)
+        {
+            using var connection = _connectionFactory.Create();
+
+            const string sql = @"
+                UPDATE Users
+                SET Email = @Email,
+                DisplayName = @DisplayName,
+                IsCompanyAdmin = @IsCompanyAdmin,
+                IsActive = @IsActive,
+                UpdatedAt = SYSUTCDATETIME(),
+                UpdatedByUserId = @UpdatedByUserId
+                WHERE Id = @Id
+                AND CompanyId = @CompanyId
+                AND IsDeleted = 0
+                AND IsSuperAdmin = 0; -- tenant admins can never edit superadmins
+            ";
+            await connection.ExecuteAsync(sql, new
+            {
+                Id = id,
+                CompanyId = companyId,
+                Email = email,
+                DisplayName = displayName,
+                IsCompanyAdmin = isCompanyAdmin ? 1 : 0,
+                IsActive = isActive ? 1 : 0,
+                UpdatedByUserId = updatedByUserId
+            });
+        }
+        public async Task SetActiveTenantAsync(Guid id, Guid companyId, bool isActive, Guid updatedByUserId)
+        {
+            using var connection = _connectionFactory.Create();
+
+            const string sql = @"
+                UPDATE Users
+                SET IsActive = @IsActive,
+                UpdatedAt = SYSUTCDATETIME(),
+                UpdatedByUserId = @UpdatedByUserId
+                WHERE Id = @Id
+                AND CompanyId = @CompanyId
+                AND IsDeleted = 0
+                AND IsSuperAdmin = 0;
+            ";
+            await connection.ExecuteAsync(sql, new
+            {
+                Id = id,
+                CompanyId = companyId,
+                IsActive = isActive ? 1 : 0,
+                UpdatedByUserId = updatedByUserId
+            });
+        }
 
 
     }
