@@ -188,6 +188,78 @@ namespace AtlasRFID.Manager.Api.Repositories
 
             return rows.ToDictionary(x => x.Code, x => x.Id, StringComparer.OrdinalIgnoreCase);
         }
+        public async Task<IEnumerable<(string Code, string Effect)>> GetScopedRolePermissionEffectsAsync(
+            Guid roleId, string scopeType, Guid scopeId)
+        {
+            using var conn = _factory.Create();
+
+            const string sql = @"
+                SELECT p.Code, rps.Effect
+                FROM dbo.RolePermissionScopes rps
+                JOIN dbo.Permissions p ON p.Id = rps.PermissionId
+                WHERE rps.RoleId = @RoleId
+                  AND rps.ScopeType = @ScopeType
+                  AND rps.ScopeId = @ScopeId
+                ORDER BY p.Code;";
+
+            return await conn.QueryAsync<(string Code, string Effect)>(sql, new
+            {
+                RoleId = roleId,
+                ScopeType = scopeType,
+                ScopeId = scopeId
+            });
+        }
+        public async Task SetScopedRolePermissionsAsync(
+            Guid roleId,
+            string scopeType,
+            Guid scopeId,
+            IEnumerable<Guid> allowPermissionIds,
+            IEnumerable<Guid> denyPermissionIds,
+            Guid createdByUserId)
+        {
+            using var conn = _factory.Create();
+
+            // remove existing for that scope
+            const string deleteSql = @"
+                DELETE FROM dbo.RolePermissionScopes
+                WHERE RoleId = @RoleId AND ScopeType = @ScopeType AND ScopeId = @ScopeId;";
+
+            await conn.ExecuteAsync(deleteSql, new { RoleId = roleId, ScopeType = scopeType, ScopeId = scopeId });
+
+            const string insertSql = @"
+                INSERT INTO dbo.RolePermissionScopes
+                (Id, RoleId, PermissionId, ScopeType, ScopeId, Effect, CreatedAt, CreatedByUserId)
+                VALUES
+                (@Id, @RoleId, @PermissionId, @ScopeType, @ScopeId, @Effect, SYSUTCDATETIME(), @CreatedByUserId);";
+
+            foreach (var pid in allowPermissionIds.Distinct())
+            {
+                await conn.ExecuteAsync(insertSql, new
+                {
+                    Id = Guid.NewGuid(),
+                    RoleId = roleId,
+                    PermissionId = pid,
+                    ScopeType = scopeType,
+                    ScopeId = scopeId,
+                    Effect = "Allow",
+                    CreatedByUserId = createdByUserId
+                });
+            }
+
+            foreach (var pid in denyPermissionIds.Distinct())
+            {
+                await conn.ExecuteAsync(insertSql, new
+                {
+                    Id = Guid.NewGuid(),
+                    RoleId = roleId,
+                    PermissionId = pid,
+                    ScopeType = scopeType,
+                    ScopeId = scopeId,
+                    Effect = "Deny",
+                    CreatedByUserId = createdByUserId
+                });
+            }
+        }
 
     }
 }

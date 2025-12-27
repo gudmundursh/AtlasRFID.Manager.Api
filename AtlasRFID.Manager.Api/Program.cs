@@ -1,9 +1,10 @@
-using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using AtlasRFID.Manager.Api.Data;
 using AtlasRFID.Manager.Api.Repositories;
 using AtlasRFID.Manager.Api.Security;
+using AtlasRFID.Manager.Api.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +17,7 @@ builder.Services.AddScoped<ITenantProvider, JwtOrSingleTenantProvider>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<LogRepository>();
 builder.Services.AddScoped<RbacRepository>();
+builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<AtlasRFID.Manager.Api.Services.IAuditLogger, AtlasRFID.Manager.Api.Services.AuditLogger>();
 builder.Services.AddHttpContextAccessor();

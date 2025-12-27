@@ -16,13 +16,16 @@ namespace AtlasRFID.Manager.Api.Controllers
         private readonly ITenantProvider _tenant;
         private readonly IAuditLogger _audit;
         private readonly ICorrelationIdProvider _corr;
+        private readonly IPermissionService _perm;
 
-        public RolesController(RbacRepository rbac, ITenantProvider tenant, IAuditLogger audit, ICorrelationIdProvider corr)
+
+        public RolesController(RbacRepository rbac, ITenantProvider tenant, IAuditLogger audit, ICorrelationIdProvider corr, IPermissionService perm)
         {
             _rbac = rbac;
             _tenant = tenant;
             _audit = audit;
             _corr = corr;
+            _perm = perm;
         }
 
         [HttpGet("permissions")]
@@ -158,6 +161,76 @@ namespace AtlasRFID.Manager.Api.Controllers
 
             var codes = await _rbac.GetRolePermissionCodesAsync(id);
             return Ok(codes);
+        }
+        [HttpGet("{roleId:guid}/scopes/{scopeType}/{scopeId:guid}/permissions")]
+        public async Task<IActionResult> GetScopedPermissions(Guid roleId, string scopeType, Guid scopeId)
+        {
+            var userId = GetUserIdOrNull();
+            if (userId == null) return Unauthorized(new { error = "missing_user_id_claim" });
+
+            // permission behind it:
+            var canManage = await _perm.HasAsync(userId.Value, "rbac.scopedPermissions.manage");
+            if (!canManage) return Forbid();
+
+            var companyId = _tenant.GetCompanyId();
+
+            var role = await _rbac.GetRoleByIdAsync(roleId);
+            if (role == null) return NotFound();
+            if (role.CompanyId != companyId) return Forbid();
+
+            var effects = (await _rbac.GetScopedRolePermissionEffectsAsync(roleId, scopeType, scopeId)).ToList();
+
+            var allow = effects.Where(x => string.Equals(x.Effect, "Allow", StringComparison.OrdinalIgnoreCase)).Select(x => x.Code).ToList();
+            var deny = effects.Where(x => string.Equals(x.Effect, "Deny", StringComparison.OrdinalIgnoreCase)).Select(x => x.Code).ToList();
+
+            return Ok(new { roleId, scopeType, scopeId, allow, deny });
+        }
+        [HttpPut("{roleId:guid}/scopes/{scopeType}/{scopeId:guid}/permissions")]
+        public async Task<IActionResult> SetScopedPermissions(Guid roleId, string scopeType, Guid scopeId, [FromBody] SetScopedRolePermissionsRequest request)
+        {
+            var userId = GetUserIdOrNull();
+            if (userId == null) return Unauthorized(new { error = "missing_user_id_claim" });
+
+            var canManage = await _perm.HasAsync(userId.Value, "rbac.scopedPermissions.manage");
+            if (!canManage) return Forbid();
+
+            var companyId = _tenant.GetCompanyId();
+
+            var role = await _rbac.GetRoleByIdAsync(roleId);
+            if (role == null) return NotFound();
+            if (role.CompanyId != companyId) return Forbid();
+
+            // Validate permission codes exist
+            var allCodes = request.Allow.Concat(request.Deny).ToList();
+            var map = await _rbac.GetPermissionIdsByCodeAsync(allCodes);
+
+            var normalized = allCodes.Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var missing = normalized.Where(c => !map.ContainsKey(c)).ToList();
+            if (missing.Count > 0)
+                return BadRequest(new { error = "unknown_permission_codes", codes = missing });
+
+            var allowIds = request.Allow.Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => map[c.Trim()]).ToList();
+            var denyIds = request.Deny.Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => map[c.Trim()]).ToList();
+
+            // BEFORE snapshot
+            var before = (await _rbac.GetScopedRolePermissionEffectsAsync(roleId, scopeType, scopeId)).ToList();
+
+            await _rbac.SetScopedRolePermissionsAsync(roleId, scopeType, scopeId, allowIds, denyIds, userId.Value);
+
+            // AFTER snapshot
+            var after = (await _rbac.GetScopedRolePermissionEffectsAsync(roleId, scopeType, scopeId)).ToList();
+
+            await AuditAsync(_audit, _corr,
+                companyId: companyId,
+                action: "SetScopedPermissions",
+                entityType: "Role",
+                entityId: roleId,
+                before: new { scopeType, scopeId, permissions = before },
+                after: new { scopeType, scopeId, permissions = after },
+                message: $"Updated scoped permissions for role '{role.Code}' ({scopeType}:{scopeId})"
+            );
+
+            return Ok(new { ok = true });
         }
 
     }
