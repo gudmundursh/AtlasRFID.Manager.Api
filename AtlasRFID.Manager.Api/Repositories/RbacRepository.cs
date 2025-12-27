@@ -167,5 +167,27 @@ namespace AtlasRFID.Manager.Api.Repositories
                 ORDER BY r.Name;";
             return await conn.QueryAsync(sql, new { UserId = userId });
         }
+        public async Task<Dictionary<string, Guid>> GetPermissionIdsByCodeAsync(IEnumerable<string> codes)
+        {
+            using var conn = _factory.Create();
+
+            var codeList = codes
+                .Where(c => !string.IsNullOrWhiteSpace(c))
+                .Select(c => c.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (codeList.Count == 0) return new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+
+            const string sql = @"
+                SELECT Code, Id
+                FROM dbo.Permissions
+                WHERE IsActive = 1 AND Code IN @Codes;";
+
+            var rows = await conn.QueryAsync<(string Code, Guid Id)>(sql, new { Codes = codeList });
+
+            return rows.ToDictionary(x => x.Code, x => x.Id, StringComparer.OrdinalIgnoreCase);
+        }
+
     }
 }

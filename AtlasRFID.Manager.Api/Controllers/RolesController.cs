@@ -100,5 +100,65 @@ namespace AtlasRFID.Manager.Api.Controllers
 
             return Ok(afterRole);
         }
+        [HttpPut("{id:guid}/permissions")]
+        public async Task<IActionResult> SetPermissions(Guid id, [FromBody] SetRolePermissionsRequest request)
+        {
+            var userId = GetUserIdOrNull();
+            if (userId == null) return Unauthorized(new { error = "missing_user_id_claim" });
+
+            var companyId = _tenant.GetCompanyId();
+
+            var role = await _rbac.GetRoleByIdAsync(id);
+            if (role == null) return NotFound();
+            if (role.CompanyId != companyId) return Forbid();
+
+            var beforePerms = (await _rbac.GetRolePermissionCodesAsync(id)).ToList();
+
+            var requestedCodes = request.PermissionCodes ?? new List<string>();
+            var map = await _rbac.GetPermissionIdsByCodeAsync(requestedCodes);
+
+            // validate: if user asks for unknown permission codes, reject
+            var normalizedRequested = requestedCodes
+                .Where(c => !string.IsNullOrWhiteSpace(c))
+                .Select(c => c.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var missing = normalizedRequested
+                .Where(c => !map.ContainsKey(c))
+                .ToList();
+
+            if (missing.Count > 0)
+                return BadRequest(new { error = "unknown_permission_codes", codes = missing });
+
+            await _rbac.SetRolePermissionsAsync(id, map.Values);
+
+            var afterPerms = (await _rbac.GetRolePermissionCodesAsync(id)).ToList();
+
+            await AuditAsync(_audit, _corr,
+                companyId: companyId,
+                action: "SetPermissions",
+                entityType: "Role",
+                entityId: id,
+                before: new { role = new { role.Id, role.Code, role.Name }, permissions = beforePerms },
+                after: new { role = new { role.Id, role.Code, role.Name }, permissions = afterPerms },
+                message: $"Updated permissions for role '{role.Code}'"
+            );
+
+            return Ok(new { roleId = id, permissions = afterPerms });
+        }
+        [HttpGet("{id:guid}/permissions")]
+        public async Task<IActionResult> GetRolePermissions(Guid id)
+        {
+            var companyId = _tenant.GetCompanyId();
+
+            var role = await _rbac.GetRoleByIdAsync(id);
+            if (role == null) return NotFound();
+            if (role.CompanyId != companyId) return Forbid();
+
+            var codes = await _rbac.GetRolePermissionCodesAsync(id);
+            return Ok(codes);
+        }
+
     }
 }
